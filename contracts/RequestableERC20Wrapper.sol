@@ -88,7 +88,7 @@ contract RequestableERC20Wrapper is StandardToken {
     address requestor,
     bytes32 trieKey,
     bytes32 trieValue
-  ) external isInitialized returns (bool success) {
+  ) external returns (bool success) {
     require(development || msg.sender == address(0));
     require(trieKey == getBalanceTrieKey(requestor));
 
