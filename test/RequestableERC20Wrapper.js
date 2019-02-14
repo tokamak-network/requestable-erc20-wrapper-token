@@ -29,6 +29,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
       wrapper:  ${wrapper.address}
     `);
 
+    await wrapper.init(owner);
     await token.mint(user, tokenAmount);
   });
 

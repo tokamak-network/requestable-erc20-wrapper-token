@@ -5,9 +5,15 @@ import "./lib/ERC20.sol";
 import "./lib/StandardToken.sol";
 
 
+/**
+ * @title   RequestableERC20Wrapper
+ * @notice  RequestableERC20Wrapper is a requestable token contract that can exchange
+ *          another base ERC20 token.
+ */
 contract RequestableERC20Wrapper is StandardToken {
   using SafeMath for *;
 
+  bool public initialized;
   bool public development;
   address public rootchain;
   ERC20 public token;
@@ -18,19 +24,24 @@ contract RequestableERC20Wrapper is StandardToken {
   event Withdrawn(address _from, uint _value);
   event RequestCreated(bool _isExit, address _requestor, bytes32 _trieKey, bytes32 _trieValue);
 
-  constructor(bool _development, address _rootchain, ERC20 _token) public {
-    bool noRootChain = _rootchain == address(0);
-    bool noToken = address(_token) == address(0);
+  modifier isInitialized() {
+    require(initialized);
+    _;
+  }
 
-    // Both of rootchain and token should be valid address or 0x00.
-    require(_development || (noRootChain && noToken || !noRootChain && !noToken));
-
+  constructor(bool _development, ERC20 _token) public {
     development = _development;
-    rootchain = _rootchain;
     token = _token;
   }
 
-  function deposit(uint _amount) external returns (bool) {
+  function init(address _rootchain) external returns (bool) {
+    require(!initialized);
+
+    rootchain = _rootchain;
+    initialized = true;
+  }
+
+  function deposit(uint _amount) external isInitialized returns (bool) {
     mint(msg.sender, _amount);
     emit Depositted(msg.sender, _amount);
     require(token.transferFrom(msg.sender, this, _amount));
@@ -38,7 +49,7 @@ contract RequestableERC20Wrapper is StandardToken {
     return true;
   }
 
-  function withdraw(uint _amount) external returns (bool) {
+  function withdraw(uint _amount) external isInitialized returns (bool) {
     burn(msg.sender, _amount);
     emit Withdrawn(msg.sender, _amount);
     require(token.transfer(msg.sender, _amount));
@@ -56,8 +67,8 @@ contract RequestableERC20Wrapper is StandardToken {
     address requestor,
     bytes32 trieKey,
     bytes32 trieValue
-  ) external returns (bool success) {
-    require(development || msg.sender == address(rootchain));
+  ) external isInitialized returns (bool success) {
+    require(msg.sender == address(rootchain));
     require(trieKey == getBalanceTrieKey(requestor));
 
     if (isExit) {
@@ -77,7 +88,7 @@ contract RequestableERC20Wrapper is StandardToken {
     address requestor,
     bytes32 trieKey,
     bytes32 trieValue
-  ) external returns (bool success) {
+  ) external isInitialized returns (bool success) {
     require(development || msg.sender == address(0));
     require(trieKey == getBalanceTrieKey(requestor));
 
