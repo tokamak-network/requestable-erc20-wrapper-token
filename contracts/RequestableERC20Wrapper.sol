@@ -3,14 +3,14 @@ pragma solidity ^0.4.24;
 import "./lib/SafeMath.sol";
 import "./lib/ERC20.sol";
 import "./lib/StandardToken.sol";
-
+import "./RequestableI.sol";
 
 /**
  * @title   RequestableERC20Wrapper
  * @notice  RequestableERC20Wrapper is a requestable token contract that can exchange
  *          another base ERC20 token.
  */
-contract RequestableERC20Wrapper is StandardToken {
+contract RequestableERC20Wrapper is StandardToken, RequestableI {
   using SafeMath for *;
 
   bool public initialized;
@@ -22,7 +22,7 @@ contract RequestableERC20Wrapper is StandardToken {
   /* Events */
   event Depositted(address _from, uint _value);
   event Withdrawn(address _from, uint _value);
-  event RequestCreated(bool _isExit, address _requestor, bytes32 _trieKey, bytes32 _trieValue);
+  event RequestCreated(bool _isExit, address _requestor, bytes32 _trieKey, uint _value);
 
   modifier isInitialized() {
     require(initialized);
@@ -66,18 +66,20 @@ contract RequestableERC20Wrapper is StandardToken {
     uint256 requestId,
     address requestor,
     bytes32 trieKey,
-    bytes32 trieValue
+    bytes trieValue
   ) external isInitialized returns (bool success) {
     require(msg.sender == address(rootchain));
     require(trieKey == getBalanceTrieKey(requestor));
 
+    uint v = decodeTrieValue(trieValue);
+
     if (isExit) {
-      mint(requestor, uint(trieValue));
+      mint(requestor, v);
     } else {
-      burn(requestor, uint(trieValue));
+      burn(requestor, v);
     }
 
-    emit RequestCreated(isExit, requestor, trieKey, trieValue);
+    emit RequestCreated(isExit, requestor, trieKey, v);
 
     return true;
   }
@@ -87,20 +89,30 @@ contract RequestableERC20Wrapper is StandardToken {
     uint256 requestId,
     address requestor,
     bytes32 trieKey,
-    bytes32 trieValue
+    bytes trieValue
   ) external returns (bool success) {
     require(development || msg.sender == address(0));
     require(trieKey == getBalanceTrieKey(requestor));
 
+    uint v = decodeTrieValue(trieValue);
+
     if (isExit) {
-      burn(requestor, uint(trieValue));
+      burn(requestor, v);
     } else {
-      mint(requestor, uint(trieValue));
+      mint(requestor, v);
     }
 
-    emit RequestCreated(isExit, requestor, trieKey, trieValue);
+    emit RequestCreated(isExit, requestor, trieKey, v);
 
     return true;
+  }
+
+  function decodeTrieValue(bytes memory trieValue) public pure returns (uint v) {
+    require(trieValue.length == 0x20);
+
+    assembly {
+       v := mload(add(trieValue, 0x20))
+    }
   }
 
 
