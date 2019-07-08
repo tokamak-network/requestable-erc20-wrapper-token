@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.0;
 
 import "./lib/SafeMath.sol";
 import "./lib/ERC20.sol";
@@ -44,7 +44,7 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
   function deposit(uint _amount) external isInitialized returns (bool) {
     mint(msg.sender, _amount);
     emit Depositted(msg.sender, _amount);
-    require(token.transferFrom(msg.sender, this, _amount));
+    require(token.transferFrom(msg.sender, address(this), _amount));
 
     return true;
   }
@@ -66,7 +66,7 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
     uint256 requestId,
     address requestor,
     bytes32 trieKey,
-    bytes trieValue
+    bytes calldata trieValue
   ) external isInitialized returns (bool success) {
     require(msg.sender == address(rootchain));
     require(trieKey == getBalanceTrieKey(requestor));
@@ -89,7 +89,7 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
     uint256 requestId,
     address requestor,
     bytes32 trieKey,
-    bytes trieValue
+    bytes calldata trieValue
   ) external returns (bool success) {
     require(development || msg.sender == address(0));
     require(trieKey == getBalanceTrieKey(requestor));

@@ -3,7 +3,7 @@ const { expectThrow } = require('openzeppelin-solidity/test/helpers/expectThrow'
 const { padLeft, padRight } = require('./helpers/pad');
 
 const RequestableERC20Wrapper = artifacts.require('./RequestableERC20Wrapper.sol');
-const MintableToken = artifacts.require('./MintableToken.sol');
+const ERC20Mintable = artifacts.require('./ERC20Mintable.sol');
 
 require('chai')
   .use(require('chai-bignumber')(web3.BigNumber))
@@ -21,7 +21,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
   let token, wrapper;
 
   before(async () => {
-    token = await MintableToken.deployed();
+    token = await ERC20Mintable.deployed();
     wrapper = await RequestableERC20Wrapper.deployed();
 
     console.log(`
