@@ -1,4 +1,4 @@
-ragma solidity ^0.5.0;
+pragma solidity ^0.5.0;
 
 import "Context.sol";
 import "Roles.sol";
