@@ -15,8 +15,6 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
   bool public initialized;
   bool public development;
   address public rootchain;
-  ERC20 public token;
-
 
   /* Events */
   event RequestCreated(bool _isExit, address _requestor, bytes32 _trieKey, uint _value);
@@ -26,9 +24,8 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     _;
   }
 
-  constructor(bool _development, ERC20 _token) public {
+  constructor(bool _development) public {
     development = _development;
-    token = _token;
   }
 
   function init(address _rootchain) external returns (bool) {
