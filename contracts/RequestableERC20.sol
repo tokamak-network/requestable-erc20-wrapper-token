@@ -3,6 +3,7 @@ pragma solidity ^0.5.0;
 import "./lib/SafeMath.sol";
 import "./lib/ERC20.sol";
 import "./lib/StandardToken.sol";
+import "./lib/MinterRole.sol";
 import "./RequestableI.sol";
 
 /**
