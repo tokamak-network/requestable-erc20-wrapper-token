@@ -39,7 +39,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
 
       await wrapper.deposit(tokenAmount, { from: user });
       expect(await token.balanceOf(user)).to.be.bignumber.equal('0');
-      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('100');
+      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('1000000');
     });
 
     it('user can withdraw token', async () => {
