@@ -1,4 +1,3 @@
-// require('openzeppelin-test-helpers/configure')({ web3 });
 const { expectEvent, expectRevert } = require('openzeppelin-test-helpers');
 const { padLeft, padRight } = require('./helpers/pad');
 const chai = require('chai');
@@ -9,14 +8,15 @@ chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
 
-const toBN = web3.utils.toBN;
-
 contract('RequestableERC20', (accounts) => {
   const owner = accounts[0];
   const user = accounts[1];
 
+  const pHundred = '100'
+  const mHundred = '-100'
+
   const tokenAmount = web3.utils.toBN(1000000);
-  const requestAmount = web3.utils.toBN(100);
+  const requestAmount = web3.utils.toBN(pHundred);
 
   let token;
 
@@ -44,9 +44,9 @@ contract('RequestableERC20', (accounts) => {
 
   describe('Add an Address into minters', async () => {
     it('append 0x00..01 into minters array)', async () => {
-       const nullNA = "0x0000000000000000000000000000000000000001"
-       await token.addMinter(nullNA);
-       expect(await token.isMinter(nullNA)).to.be.equal(true);
+       const zeroOne = "0x0000000000000000000000000000000000000001"
+       await token.addMinter(zeroOne);
+       expect(await token.isMinter(zeroOne)).to.be.equal(true);
     });
   });
 
@@ -72,7 +72,7 @@ contract('RequestableERC20', (accounts) => {
       const isExit = false;
 
       it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = toBN(1e19);
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
         await expectRevert.unspecified(
@@ -87,7 +87,7 @@ contract('RequestableERC20', (accounts) => {
 
         const balance1 = await token.balanceOf(user);
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal('-100')
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
       });
 
       it('balance in child chain should be updated', async () => {
@@ -97,7 +97,7 @@ contract('RequestableERC20', (accounts) => {
 
         const balance1 = await token.balanceOf(user);
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal('100');
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
       });
     });
 
@@ -105,7 +105,7 @@ contract('RequestableERC20', (accounts) => {
       const isExit = true;
 
       it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = toBN(1e19);
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
         await expectRevert.unspecified(
@@ -119,7 +119,7 @@ contract('RequestableERC20', (accounts) => {
         await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal('-100')
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
       });
 
       it('balance in root chain should be updated', async () => {
@@ -128,7 +128,7 @@ contract('RequestableERC20', (accounts) => {
         await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal('100')
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred)
       });
     });
   });
