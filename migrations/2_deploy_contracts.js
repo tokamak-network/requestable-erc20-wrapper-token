@@ -9,12 +9,12 @@ module.exports = function (deployer) {
   deployer.deploy(RequestableERC20, development);
 
   if (tokenAddress) {
-    deployer.deploy(RequestableERC20Wrapper, development, tokenAddress);
+    deployer.deploy(RequestableERC20Wrapper, tokenAddress);
     return;
   }
 
   deployer.deploy(ERC20Mintable).then((token) =>
-    deployer.deploy(RequestableERC20Wrapper, development, token.address)
+    deployer.deploy(RequestableERC20Wrapper, token.address)
   ).catch(e => { throw e; });
 
 };

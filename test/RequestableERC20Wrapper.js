@@ -9,14 +9,12 @@ chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
 
-const toBN = web3.utils.toBN;
-
 contract('RequestableERC20Wrapper', (accounts) => {
   const owner = accounts[0];
   const user = accounts[1];
 
-  const tokenAmount = 10000;
-  const requestAmount = 100;
+  const tokenAmount = web3.utils.toBN(1000000);
+  const requestAmount = web3.utils.toBN(100);
 
   let token, wrapper;
 
@@ -35,19 +33,19 @@ contract('RequestableERC20Wrapper', (accounts) => {
 
   describe('deposit and withdraw', async () => {
     it('user can deposit token', async () => {
-      expect(await token.balanceOf(user)).to.be.equal(tokenAmount);
+      expect(await token.balanceOf(user)).to.be.bignumber.equal('1000000');
 
-      await token.approve(wrapper.address, tokenAmount, { from: user });
+      await token.approve(wrapper.address, tokenAmount, { from: user , gas: 9000000});
 
       await wrapper.deposit(tokenAmount, { from: user });
-      expect(await token.balanceOf(user)).to.be.equal(0);
+      expect(await token.balanceOf(user)).to.be.bignumber.equal('0');
       expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('100');
     });
 
     it('user can withdraw token', async () => {
-      await wrapper.withdraw(requestAmount, { from: user });
+      await wrapper.withdraw(requestAmount, { from: user , gas: 9000000});
       expect(await token.balanceOf(user)).to.be.bignumber.equal('100');
-      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('99900');
+      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('999900');
     });
   });
 
@@ -64,11 +62,11 @@ contract('RequestableERC20Wrapper', (accounts) => {
       const isExit = false;
 
       it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = toBN(1e19);
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
         await expectRevert.unspecified(
-          wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue),
+          wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue, { gas: 9000000 }),
         );
       });
 
@@ -97,7 +95,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
       const isExit = true;
 
       it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = toBN(1e19);
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
         await expectRevert.unspecified(
