@@ -8,14 +8,14 @@ import "./RequestableERC20.sol";
  * @notice  RequestableERC20Wrapper is a requestable token contract that can exchange
  *          another base ERC20 token.
  */
-contract RequestableERC20Wrapper is RequestableERC20(false) {
+contract RequestableERC20Wrapper is RequestableERC20 {
   ERC20 public token;
 
   // Events
   event Depositted(address _from, uint _value);
   event Withdrawn(address _from, uint _value);
 
-  constructor(ERC20 _token) public {
+  constructor(bool development, ERC20 _token) RequestableERC20(development) public {
     token = _token;
   }
 

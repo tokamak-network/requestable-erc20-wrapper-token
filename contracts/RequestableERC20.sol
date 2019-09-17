@@ -110,8 +110,9 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     bytes32 trieKey,
     bytes calldata trieValue
   ) external returns (bool success) {
-    // TODO: adpot RootChain
-    // require(msg.sender == address(rootchain));
+    if (!development) {
+      require(msg.sender == address(rootchain));
+    }
     require(!appliedRequests[requestId]);
 
     if (isExit) {
@@ -173,8 +174,9 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     bytes32 trieKey,
     bytes calldata trieValue
   ) external returns (bool success) {
-    // TODO: adpot child chain
-    // require(msg.sender == address(0));
+    if (!development) {
+      require(msg.sender == address(0));
+    }
     require(!appliedRequests[requestId]);
 
     if (isExit) {

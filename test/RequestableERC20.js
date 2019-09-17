@@ -7,6 +7,7 @@ const RequestableERC20 = artifacts.require('./RequestableERC20.sol');
 chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
+const development = true
 
 contract('RequestableERC20', (accounts) => {
   const owner = accounts[0];
@@ -21,7 +22,7 @@ contract('RequestableERC20', (accounts) => {
   let token;
 
   before(async () => {
-    token = await RequestableERC20.deployed();
+    token = await RequestableERC20.new(development);
 
     console.log(`token:    ${token.address}`);
 

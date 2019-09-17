@@ -8,6 +8,7 @@ const ERC20Mintable = artifacts.require('./ERC20Mintable.sol');
 chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
+const development = true
 
 contract('RequestableERC20Wrapper', (accounts) => {
   const owner = accounts[0];
@@ -23,8 +24,8 @@ contract('RequestableERC20Wrapper', (accounts) => {
   let token, wrapper;
 
   before(async () => {
-    token = await ERC20Mintable.deployed();
-    wrapper = await RequestableERC20Wrapper.deployed();
+    token = await ERC20Mintable.new();
+    wrapper = await RequestableERC20Wrapper.new(development, token.address);
 
     console.log(`
       token:    ${token.address}
