@@ -30,7 +30,9 @@ library Roles {
      * @return bool
      */
     function has(Role storage role, address account) internal view returns (bool) {
-        require(account != address(0), "Roles: account is the zero address");
+        // require(account != address(0), "Roles: account is the zero address");
+        // This is for plasma-evm stamina contract
+        require(account != address(0x000000000000000000000000000000000000dEaD), "Roles: account is stamina contract address");
         return role.bearer[account];
     }
 }
