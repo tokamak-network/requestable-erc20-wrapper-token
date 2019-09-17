@@ -28,30 +28,24 @@ contract('RequestableERC20', (accounts) => {
     await token.mint(user, tokenAmount, {from: owner});
   });
 
-  describe('Valid Mint Token by Owner', async () => {
-    it('Check Balance of User', async () => {
+  describe('Start Token Mint test', async () => {
+    it('Valid Mint Token by Owner', async () => {
       expect(await token.balanceOf(user)).to.be.bignumber.equal(tokenAmount);
     });
-  });
 
-  describe('Invalid Mint Token by User', async () => {
     it('Mint Token User by self', async () => {
       await expectRevert.unspecified(
         token.mint(user, tokenAmount, {from: user})
       );
     });
-  });
 
-  describe('Add an Address into minters', async () => {
-    it('append 0x00..01 into minters array)', async () => {
+    it('Add an Address into minters, append 0x00..01 into minters array)', async () => {
        const zeroOne = "0x0000000000000000000000000000000000000001"
        await token.addMinter(zeroOne);
        expect(await token.isMinter(zeroOne)).to.be.equal(true);
     });
-  });
 
-  describe('Check Ownership as Minter', async () => {
-    it('renounce Minter(removed minter list)', async () => {
+    it('Check Ownership as Minter, renounce Minter(removed minter list)', async () => {
       await token.renounceMinter();
       await expectRevert.unspecified(
         token.mint(user, tokenAmount, {from: owner})
