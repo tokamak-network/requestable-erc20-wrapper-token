@@ -8,6 +8,7 @@ chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
 const development = true
+const nullAddress = "0x0000000000000000000000000000000000000000"
 
 contract('RequestableERC20', (accounts) => {
   const owner = accounts[0];
@@ -25,7 +26,6 @@ contract('RequestableERC20', (accounts) => {
     token = await RequestableERC20.new(development);
 
     console.log(`token:    ${token.address}`);
-
     await token.mint(user, tokenAmount, {from: owner});
   });
 
@@ -40,17 +40,14 @@ contract('RequestableERC20', (accounts) => {
       );
     });
 
-    it('Add an Address into minters, append 0x00..01 into minters array)', async () => {
-       const zeroOne = "0x0000000000000000000000000000000000000001"
-       await token.addMinter(zeroOne);
-       expect(await token.isMinter(zeroOne)).to.be.equal(true);
+    it('Add an Address into minters, append NA into minters array)', async () => {
+       await token.addMinter(nullAddress);
+       expect(await token.isMinter(nullAddress)).to.be.equal(true);
     });
 
-    it('Check Ownership as Minter, renounce Minter(removed minter list)', async () => {
-      await token.renounceMinter();
-      await expectRevert.unspecified(
-        token.mint(user, tokenAmount, {from: owner})
-      );
+    it('Add an Address into burners, append NA into minters array)', async () => {
+       await token.addBurner(nullAddress);
+       expect(await token.isBurner(nullAddress)).to.be.equal(true);
     });
   });
 
@@ -124,6 +121,26 @@ contract('RequestableERC20', (accounts) => {
 
         const balance1 = await token.balanceOf(user);
         expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred)
+      });
+    });
+
+    describe("#Role Test", () => {
+      it('Renounce Minter then check minters array', async () => {
+        await token.renounceMinter();
+        await expectRevert.unspecified(token.mint(user, tokenAmount, {from: owner}));
+
+        const remainMinters = await token.getMinters();
+        expect(remainMinters.length).to.be.equal(1);
+        expect(remainMinters[0]).to.be.equal(nullAddress);
+      });
+
+      it('Renounce Burner then check burners array', async () => {
+        await token.renounceBurner();
+        await expectRevert.unspecified(token.burn(user, tokenAmount, {from: owner}));
+
+        const remainBurners = await token.getBurners();
+        expect(remainBurners.length).to.be.equal(1);
+        expect(remainBurners[0]).to.be.equal(nullAddress);
       });
     });
   });

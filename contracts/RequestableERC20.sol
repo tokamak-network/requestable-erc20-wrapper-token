@@ -2,26 +2,28 @@ pragma solidity ^0.5.0;
 
 import "./lib/SafeMath.sol";
 import "./lib/ERC20.sol";
+import "./RequestableI.sol";
 import "./lib/StandardToken.sol";
 import "./lib/MinterRole.sol";
-import "./RequestableI.sol";
+import "./lib/BurnerRole.sol";
 
 /**
  * @title   RequestableERC20
  * @notice  RequestableERC20 is a requestable token contract with Compatible ERC20
  */
-contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
+contract RequestableERC20 is StandardToken, RequestableI, MinterRole, BurnerRole {
   using SafeMath for *;
 
   bool public initialized;
   bool public development;
   address public rootchain;
+
   address[] public minters;
+  address[] public burners;
 
   // Requests
   mapping(uint => bool) appliedRequests;
 
-  bytes32 constant public KEY_OWNER         = 0x0000000000000000000000000000000000000000000000000000000000000000;
   bytes32 constant public KEY_TOTAL_SUPPLY  = 0x0000000000000000000000000000000000000000000000000000000000000001;
   bytes32 constant public PERFIX_BALANCES   = 0x0000000000000000000000000000000000000000000000000000000000000002;
 
@@ -33,15 +35,18 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     _;
   }
 
-  constructor(bool _development) public {
+  constructor(bool _development) MinterRole() BurnerRole() public {
     development = _development;
+
     minters.push(_msgSender());
+    burners.push(_msgSender());
   }
 
   function init(address _rootchain) external returns (bool) {
     require(!initialized);
 
     rootchain = _rootchain;
+
     initialized = true;
     return initialized;
   }
@@ -58,6 +63,11 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
         return true;
   }
 
+  function burn(address account, uint256 amount) public onlyBurner returns (bool) {
+        _burn(account, amount);
+        return true;
+  }
+
   function _mint(address _to, uint _amount) internal {
     totalSupply_ = totalSupply_.add(_amount);
     balances[_to] = balances[_to].add(_amount);
@@ -71,31 +81,76 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
   }
 
   /**
-   * @dev helper function to view minters list.
-   * If there is empty, token could not mint more it means that fixed totalSupply.
+   * @dev getter function to view minters/burners list.
    */
-  function getMinters() public view returns (address [] memory) {
+  function getMinters() public view returns (address[] memory) {
     return minters;
   }
 
-  /**
-   * @dev only mint this token who belongs in minters. which means there is only one
-   * account pushed when this deployed on constructor method.
-   * @param account address The address which added to Token Minter.
-   */
-  function addMinter(address account) public onlyMinter {
-    super.addMinter(account);
-    minters.push(account);
+  function getBurners() public view returns (address[] memory) {
+    return burners;
   }
 
   /**
-   * @dev deployer EOA register as minters array.
-   * this method only remove first of minters.
+   * @dev only mint/burn this token who belongs in minters or burners.
+   * account pushed when this deployed on constructor method.
+   * @param account address The address who belongs to Minters or Burners.
+   */
+  function addMinter(address account) public onlyMinter {
+    minters.push(account);
+    super.addMinter(account);
+  }
+
+  function addBurner(address account) public onlyBurner {
+    burners.push(account);
+    super.addBurner(account);
+  }
+
+  /**
+   * @dev deployer is already in minters and burners array.
    */
   function renounceMinter() public {
-    require((_msgSender() == msg.sender), "This is not an contract deployer");
+    // swap and delete minters array.
+    bool mintersEmpty = (minters.length != 0);
+    require(mintersEmpty, "There is no minters left");
+
+    if (minters.length > 1) {
+      for (uint i=0; i < minters.length; i++) {
+        if (minters[i] == _msgSender()) {
+          minters[i] = minters[minters.length - 1];
+          delete minters[minters.length - 1];
+          minters.length--;
+        }
+      }
+    } else {
+        if (minters[0] == _msgSender()) {
+          delete minters;
+        }
+    }
+
     super.renounceMinter();
-    delete minters[0];
+  }
+
+  function renounceBurner() public {
+    // swap and delete burners array.
+    bool burnersEmpty = (burners.length != 0);
+    require(burnersEmpty, "There is no burners left");
+
+    if (burners.length > 1) {
+      for (uint i=0; i < burners.length; i++) {
+        if (burners[i] == _msgSender()) {
+          burners[i] = burners[burners.length - 1];
+          delete burners[burners.length - 1];
+          burners.length--;
+        }
+      }
+    } else {
+        if (burners[0] == _msgSender()) {
+          delete burners;
+        }
+    }
+
+    super.renounceBurner();
   }
 
   // User can get the trie key of one's balance and make an enter request directly.
@@ -116,31 +171,21 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     require(!appliedRequests[requestId]);
 
     if (isExit) {
-      if (KEY_OWNER == trieKey) {
-        // only owner (in child chain) can exit `owner` variable.
-        // but it is checked in applyRequestInChildChain and exitChallenge.
-
-        // set requestor as owner in root chain.
-        // _transferOwnership(requestor);
-      } else if (KEY_TOTAL_SUPPLY == trieKey) {
+      if (KEY_TOTAL_SUPPLY == trieKey) {
         // no one can exit `totalSupply` variable.
         // but do nothing to return true.
       } else if (getBalanceTrieKey(requestor) == trieKey) {
         // this checks trie key equals to `balances[requestor]`.
         // only token holder can exit one's token.
         // exiting means moving tokens from child chain to root chain.
-        _mint(requestor, decodeTrieValue(trieValue));
+        mint(requestor, decodeTrieValue(trieValue));
       } else {
         // cannot exit other variables.
         // but do nothing to return true.
       }
     } else {
       // apply enter
-      if (KEY_OWNER == trieKey) {
-        // only owner (in root chain) can enter `owner` variable.
-        // require(owner() == requestor);
-        // do nothing in root chain
-      } else if (KEY_TOTAL_SUPPLY == trieKey) {
+      if (KEY_TOTAL_SUPPLY == trieKey) {
         // no one can enter `totalSupply` variable.
         revert();
       } else if (getBalanceTrieKey(requestor) == trieKey) {
@@ -148,7 +193,7 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
         // only token holder can enter one's token.
         // entering means moving tokens from root chain to child chain.
         require(balances[requestor] >= decodeTrieValue(trieValue));
-        _burn(requestor, decodeTrieValue(trieValue));
+        burn(requestor, decodeTrieValue(trieValue));
       } else {
         // cannot apply request on other variables.
         revert();
@@ -180,12 +225,7 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
     require(!appliedRequests[requestId]);
 
     if (isExit) {
-      if (KEY_OWNER == trieKey) {
-        // only owner (in child chain) can exit `owner` variable.
-        // require(owner() == requestor);
-
-        // do nothing when exit `owner` in child chain
-      } else if (KEY_TOTAL_SUPPLY == trieKey) {
+      if (KEY_TOTAL_SUPPLY == trieKey) {
         // no one can exit `totalSupply` variable.
         revert();
       } else if (getBalanceTrieKey(requestor) == trieKey) {
@@ -196,23 +236,19 @@ contract RequestableERC20 is StandardToken, RequestableI, MinterRole {
         // revert provides a proof for `exitChallenge`.
         require(balances[requestor] >= decodeTrieValue(trieValue));
 
-        _burn(requestor, decodeTrieValue(trieValue));
+        burn(requestor, decodeTrieValue(trieValue));
       } else { // cannot exit other variables.
         revert();
       }
-    } else { // apply enter
-      if (KEY_OWNER == trieKey) {
-        // only owner (in root chain) can make enterRequest of `owner` variable.
-        // but it is checked in applyRequestInRootChain.
-
-        // _transferOwnership(requestor);
-      } else if (KEY_TOTAL_SUPPLY == trieKey) {
+    } else {
+      // apply enter
+      if (KEY_TOTAL_SUPPLY == trieKey) {
         // no one can enter `totalSupply` variable.
       } else if (getBalanceTrieKey(requestor) == trieKey) {
         // this checks trie key equals to `balances[tokenHolder]`.
         // only token holder can enter one's token.
         // entering means moving tokens from root chain to child chain.
-        _mint(requestor, decodeTrieValue(trieValue));
+        mint(requestor, decodeTrieValue(trieValue));
       } else {
         // cannot apply request on other variables.
         revert();
