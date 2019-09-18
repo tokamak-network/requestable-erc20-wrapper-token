@@ -1,28 +1,31 @@
-const expectEvent = require('openzeppelin-solidity/test/helpers/expectEvent');
-const { expectThrow } = require('openzeppelin-solidity/test/helpers/expectThrow');
+const { expectEvent, expectRevert } = require('openzeppelin-test-helpers');
 const { padLeft, padRight } = require('./helpers/pad');
+const chai = require('chai');
 
 const RequestableERC20Wrapper = artifacts.require('./RequestableERC20Wrapper.sol');
 const ERC20Mintable = artifacts.require('./ERC20Mintable.sol');
 
-require('chai')
-  .use(require('chai-bignumber')(web3.BigNumber))
-  .should();
+chai.use(require('chai-bn')(web3.utils.BN));
+
+const { expect } = chai;
+const development = true
 
 contract('RequestableERC20Wrapper', (accounts) => {
-  const [
-    owner,
-    user,
-  ] = accounts;
+  const owner = accounts[0];
+  const user = accounts[1];
 
-  const tokenAmount = 10000;
-  const requestAmount = 100;
+  const pHundred = '100'
+  const mHundred = '-100'
+  const pMillion = '1000000'
+
+  const tokenAmount = web3.utils.toBN(pMillion);
+  const requestAmount = web3.utils.toBN(pHundred);
 
   let token, wrapper;
 
   before(async () => {
-    token = await ERC20Mintable.deployed();
-    wrapper = await RequestableERC20Wrapper.deployed();
+    token = await ERC20Mintable.new();
+    wrapper = await RequestableERC20Wrapper.new(development, token.address);
 
     console.log(`
       token:    ${token.address}
@@ -35,19 +38,19 @@ contract('RequestableERC20Wrapper', (accounts) => {
 
   describe('deposit and withdraw', async () => {
     it('user can deposit token', async () => {
-      (await token.balanceOf(user)).should.be.bignumber.equal(tokenAmount);
+      expect(await token.balanceOf(user)).to.be.bignumber.equal(pMillion);
 
-      await token.approve(wrapper.address, tokenAmount, { from: user });
+      await token.approve(wrapper.address, tokenAmount, { from: user , gas: 9000000});
 
       await wrapper.deposit(tokenAmount, { from: user });
-      (await token.balanceOf(user)).should.be.bignumber.equal(0);
-      (await wrapper.balanceOf(user)).should.be.bignumber.equal(tokenAmount);
+      expect(await token.balanceOf(user)).to.be.bignumber.equal('0');
+      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal(pMillion);
     });
 
     it('user can withdraw token', async () => {
-      await wrapper.withdraw(requestAmount, { from: user });
-      (await token.balanceOf(user)).should.be.bignumber.equal(requestAmount);
-      (await wrapper.balanceOf(user)).should.be.bignumber.equal(tokenAmount - requestAmount);
+      await wrapper.withdraw(requestAmount, { from: user , gas: 9000000});
+      expect(await token.balanceOf(user)).to.be.bignumber.equal(pHundred);
+      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('999900');
     });
   });
 
@@ -64,11 +67,11 @@ contract('RequestableERC20Wrapper', (accounts) => {
       const isExit = false;
 
       it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = 1e19;
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
-        await expectThrow(
-          wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue),
+        await expectRevert.unspecified(
+          wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue, { gas: 9000000 }),
         );
       });
 
@@ -79,7 +82,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
 
         const balance1 = await wrapper.balanceOf(user);
 
-        (balance1.sub(balance0)).should.be.bignumber.equal(-requestAmount);
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred);
       });
 
       it('balance in child chain should be updated', async () => {
@@ -89,8 +92,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
 
         const balance1 = await wrapper.balanceOf(user);
 
-        (balance1.sub(balance0)).should.be.bignumber.equal(requestAmount);
-        // don't need to restore balance
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
       });
     });
 
@@ -98,10 +100,10 @@ contract('RequestableERC20Wrapper', (accounts) => {
       const isExit = true;
 
       it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = 1e19;
+        const overTokenAmount = web3.utils.toBN(1e19);
         const overTrieValue = padLeft(overTokenAmount);
 
-        await expectThrow(
+        await expectRevert.unspecified(
           wrapper.applyRequestInChildChain(isExit, requestId++, user, trieKey, overTrieValue),
         );
       });
@@ -112,7 +114,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
         await wrapper.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await wrapper.balanceOf(user);
-        (balance1.sub(balance0)).should.be.bignumber.equal(-requestAmount);
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred);
       });
 
       it('balance in root chain should be updated', async () => {
@@ -121,7 +123,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
         await wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await wrapper.balanceOf(user);
-        (balance1.sub(balance0)).should.be.bignumber.equal(requestAmount);
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
       });
     });
   });
