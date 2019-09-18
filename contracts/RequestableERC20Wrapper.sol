@@ -1,21 +1,20 @@
 pragma solidity ^0.5.0;
 
-import "./lib/ERC20.sol";
-import "./RequestableERC20.sol";
+import "./RequestableERC20Mintable.sol";
 
 /**
  * @title   RequestableERC20Wrapper
  * @notice  RequestableERC20Wrapper is a requestable token contract that can exchange
  *          another base ERC20 token.
  */
-contract RequestableERC20Wrapper is RequestableERC20 {
+contract RequestableERC20Wrapper is RequestableERC20Mintable {
   ERC20 public token;
 
   // Events
   event Depositted(address _from, uint _value);
   event Withdrawn(address _from, uint _value);
 
-  constructor(bool development, ERC20 _token) RequestableERC20(development) public {
+  constructor(bool development, ERC20 _token) RequestableERC20Mintable(development) public {
     token = _token;
   }
 
