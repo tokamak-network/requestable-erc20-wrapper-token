@@ -1,72 +1,123 @@
+const RLP = require('rlp');
 const { expectEvent, expectRevert } = require('openzeppelin-test-helpers');
 const { padLeft, padRight } = require('./helpers/pad');
 const chai = require('chai');
+chai.use(require('chai-bn')(web3.utils.BN));
 
 const RequestableERC20 = artifacts.require('./RequestableERC20.sol');
 
-chai.use(require('chai-bn')(web3.utils.BN));
+const { toBN, toHex } = web3.utils;
 
 const { expect } = chai;
-const development = true
-const nullAddress = "0x0000000000000000000000000000000000000000"
+
+const nullAddress = '0x0000000000000000000000000000000000000000';
 
 contract('RequestableERC20', (accounts) => {
-  const owner = accounts[0];
-  const user = accounts[1];
+  const [owner, user] = accounts;
 
-  const pHundred = '100'
-  const mHundred = '-100'
+  const development = true;
+  const lockInRootChain = false;
+  const initialSupply = toBN(100e18);
 
-  const tokenAmount = web3.utils.toBN(1000000);
-  const requestAmount = web3.utils.toBN(pHundred);
+  const tokenAmount = toBN(1000000);
+  const requestAmount = toBN(100);
+  const overTokenAmount = toBN(1e19);
 
   let token;
 
+  let requestId = 0;
+
   before(async () => {
-    token = await RequestableERC20.new(development);
+    token = await RequestableERC20.new(development, lockInRootChain, initialSupply);
 
-    console.log(`token:    ${token.address}`);
-    await token.mint(user, tokenAmount, {from: owner});
+    await token.transfer(user, tokenAmount, { from: owner });
   });
 
-  describe('Start Token Mint test', async () => {
-    it('Valid Mint Token by Owner', async () => {
-      expect(await token.balanceOf(user)).to.be.bignumber.equal(tokenAmount);
-    });
-
-    it('Mint Token User by self', async () => {
-      await expectRevert.unspecified(
-        token.mint(user, tokenAmount, {from: user})
-      );
-    });
-
-    it('Add an Address into minters, append NA into minters array)', async () => {
-       await token.addMinter(nullAddress);
-       expect(await token.isMinter(nullAddress)).to.be.equal(true);
-    });
-
-    it('Add an Address into burners, append NA into minters array)', async () => {
-       await token.addBurner(nullAddress);
-       expect(await token.isBurner(nullAddress)).to.be.equal(true);
-    });
-  });
-
-  describe('Start Enter and Exit test', () => {
-    let requestId = 0;
+  describe('Apply request', () => {
     let trieKey;
-    const trieValue = padLeft(requestAmount);
+    const trieValue = RLP.encode([owner, toHex(requestAmount)]);
+    const overTrieValue = RLP.encode([owner, toHex(overTokenAmount)]);
 
     before(async () => {
-      trieKey = await token.getBalanceTrieKey(user);
+      trieKey = await token.KEY_ALLOWANCE();
+      await token.approve(user, tokenAmount);
+    });
+
+    describe('#allowances', () => {
+      describe('#Enter', () => {
+        const isExit = false;
+
+        it('cannot make an enter request over allowance', async () => {
+          await expectRevert(
+            token.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue),
+            'SafeMath: subtraction overflow',
+          );
+        });
+
+        it('can make an enter request', async () => {
+          const allowance0 = await token.allowance(owner, user);
+
+          await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
+
+          const allowance1 = await token.allowance(owner, user);
+
+          expect(allowance1.sub(allowance0)).to.be.bignumber.equal(requestAmount.neg());
+        });
+
+        it('balance in child chain should be updated', async () => {
+          const allowance0 = await token.allowance(owner, user);
+
+          await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
+
+          const allowance1 = await token.allowance(owner, user);
+
+          expect(allowance1.sub(allowance0)).to.be.bignumber.equal(requestAmount);
+        });
+      });
+      describe('#Exit', () => {
+        const isExit = true;
+
+        it('cannot make an exit request over his balance', async () => {
+          await expectRevert(
+            token.applyRequestInChildChain(isExit, requestId++, user, trieKey, overTrieValue),
+            'SafeMath: subtraction overflow',
+          );
+        });
+
+        it('can make an exit request', async () => {
+          const allowance0 = await token.allowance(owner, user);
+
+          await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
+
+          const allowance1 = await token.allowance(owner, user);
+          expect(allowance1.sub(allowance0)).to.be.bignumber.equal(requestAmount.neg());
+        });
+
+        it('balance in root chain should be updated', async () => {
+          const allowance0 = await token.allowance(owner, user);
+
+          await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
+
+          const allowance1 = await token.allowance(owner, user);
+          expect(allowance1.sub(allowance0)).to.be.bignumber.equal(requestAmount);
+        });
+      });
+    });
+  });
+
+  describe('#balances', () => {
+    let trieKey;
+    const trieValue = RLP.encode(toHex(requestAmount));
+    const overTrieValue = RLP.encode(toHex(overTokenAmount));
+
+    before(async () => {
+      trieKey = await token.KEY_BALANCES();
     });
 
     describe('#Enter', () => {
       const isExit = false;
 
       it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
-
         await expectRevert.unspecified(
           token.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue),
         );
@@ -79,27 +130,23 @@ contract('RequestableERC20', (accounts) => {
 
         const balance1 = await token.balanceOf(user);
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(requestAmount.neg());
       });
 
-      it('balance in child chain should be updated', async () => {
+      it('balance in child chain shoul d be updated', async () => {
         const balance0 = await token.balanceOf(user);
 
         await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await token.balanceOf(user);
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(requestAmount);
       });
     });
-
     describe('#Exit', () => {
       const isExit = true;
 
       it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
-
         await expectRevert.unspecified(
           token.applyRequestInChildChain(isExit, requestId++, user, trieKey, overTrieValue),
         );
@@ -111,7 +158,7 @@ contract('RequestableERC20', (accounts) => {
         await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(requestAmount.neg());
       });
 
       it('balance in root chain should be updated', async () => {
@@ -120,27 +167,7 @@ contract('RequestableERC20', (accounts) => {
         await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
 
         const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred)
-      });
-    });
-
-    describe("#Role Test", () => {
-      it('Renounce Minter then check minters array', async () => {
-        await token.renounceMinter();
-        await expectRevert.unspecified(token.mint(user, tokenAmount, {from: owner}));
-
-        const remainMinters = await token.getMinters();
-        expect(remainMinters.length).to.be.equal(1);
-        expect(remainMinters[0]).to.be.equal(nullAddress);
-      });
-
-      it('Renounce Burner then check burners array', async () => {
-        await token.renounceBurner();
-        await expectRevert.unspecified(token.burn(user, tokenAmount, {from: owner}));
-
-        const remainBurners = await token.getBurners();
-        expect(remainBurners.length).to.be.equal(1);
-        expect(remainBurners[0]).to.be.equal(nullAddress);
+        expect(balance1.sub(balance0)).to.be.bignumber.equal(requestAmount);
       });
     });
   });
