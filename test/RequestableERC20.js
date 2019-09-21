@@ -10,8 +10,6 @@ const { toBN, toHex } = web3.utils;
 
 const { expect } = chai;
 
-const nullAddress = '0x0000000000000000000000000000000000000000';
-
 contract('RequestableERC20', (accounts) => {
   const [owner, user] = accounts;
 

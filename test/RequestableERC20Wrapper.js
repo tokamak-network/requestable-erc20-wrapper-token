@@ -8,15 +8,15 @@ const ERC20Mintable = artifacts.require('./ERC20Mintable.sol');
 chai.use(require('chai-bn')(web3.utils.BN));
 
 const { expect } = chai;
-const development = true
+const development = true;
 
 contract('RequestableERC20Wrapper', (accounts) => {
   const owner = accounts[0];
   const user = accounts[1];
 
-  const pHundred = '100'
-  const mHundred = '-100'
-  const pMillion = '1000000'
+  const pHundred = '100';
+  const mHundred = '-100';
+  const pMillion = '1000000';
 
   const tokenAmount = web3.utils.toBN(pMillion);
   const requestAmount = web3.utils.toBN(pHundred);
@@ -40,7 +40,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
     it('user can deposit token', async () => {
       expect(await token.balanceOf(user)).to.be.bignumber.equal(pMillion);
 
-      await token.approve(wrapper.address, tokenAmount, { from: user , gas: 9000000});
+      await token.approve(wrapper.address, tokenAmount, { from: user, gas: 9000000 });
 
       await wrapper.deposit(tokenAmount, { from: user });
       expect(await token.balanceOf(user)).to.be.bignumber.equal('0');
@@ -48,7 +48,7 @@ contract('RequestableERC20Wrapper', (accounts) => {
     });
 
     it('user can withdraw token', async () => {
-      await wrapper.withdraw(requestAmount, { from: user , gas: 9000000});
+      await wrapper.withdraw(requestAmount, { from: user, gas: 9000000 });
       expect(await token.balanceOf(user)).to.be.bignumber.equal(pHundred);
       expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('999900');
     });

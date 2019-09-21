@@ -1,133 +1,109 @@
-const { expectEvent, expectRevert } = require('openzeppelin-test-helpers');
-const { padLeft, padRight } = require('./helpers/pad');
+const { expectRevert } = require('openzeppelin-test-helpers');
 const chai = require('chai');
-
-const RequestableERC20 = artifacts.require('./RequestableERC20Mintable.sol');
-
 chai.use(require('chai-bn')(web3.utils.BN));
 
+const { toBN } = web3.utils;
+
+const RequestableERC20Mintable = artifacts.require('./RequestableERC20Mintable.sol');
+
 const { expect } = chai;
-const development = true
-const nullAddress = "0x0000000000000000000000000000000000000000"
+
+const toLowerCase = (l) => l.map(s => s.toLowerCase());
 
 contract('RequestableERC20Mintable', (accounts) => {
-  const owner = accounts[0];
-  const user = accounts[1];
+  const [owner, user1, user2, other] = toLowerCase(accounts);
 
-  const pHundred = '100'
-  const mHundred = '-100'
+  const development = true;
+  const lockInRootChain = false;
 
-  const tokenAmount = web3.utils.toBN(1000000);
-  const requestAmount = web3.utils.toBN(pHundred);
+  const tokenAmount = toBN(1e18);
 
   let token;
 
   before(async () => {
-    token = await RequestableERC20.new(development);
-
-    console.log(`token:    ${token.address}`);
-    await token.mint(user, tokenAmount, {from: owner});
+    console.log(`
+    owner: ${owner}
+    user1: ${user1}
+    user2: ${user2}
+    other: ${other}
+    `);
+    token = await RequestableERC20Mintable.new(development, lockInRootChain);
   });
 
-  describe('Start Token Mint test', async () => {
-    it('Valid Mint Token by Owner', async () => {
-      expect(await token.balanceOf(user)).to.be.bignumber.equal(tokenAmount);
-    });
+  it('deployer should has minter role', async () => {
+    expect(await token.isMinter(owner)).to.be.equal(true);
 
-    it('Mint Token User by self', async () => {
-      await expectRevert.unspecified(
-        token.mint(user, tokenAmount, {from: user})
-      );
-    });
+    const minters = toLowerCase(await token.getMinters());
 
-    it('Add an Address into minters, append NA into minters array)', async () => {
-       await token.addMinter(nullAddress);
-       expect(await token.isMinter(nullAddress)).to.be.equal(true);
-    });
+    expect(minters.length).to.be.equal(1);
+    expect(minters[0]).to.be.equal(owner);
   });
 
-  describe('Start Enter and Exit test', () => {
-    let requestId = 0;
-    let trieKey;
-    const trieValue = padLeft(requestAmount);
+  it('can add new minter', async () => {
+    await token.addMinter(user1);
+    expect(await token.isMinter(user1)).to.be.equal(true);
 
-    before(async () => {
-      trieKey = await token.getBalanceTrieKey(user);
-    });
+    const minters = toLowerCase(await token.getMinters());
 
-    describe('#Enter', () => {
-      const isExit = false;
+    expect(minters.length).to.be.equal(2);
+    expect(minters[0]).to.be.equal(owner);
+    expect(minters[1]).to.be.equal(user1);
+  });
 
-      it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
+  it('can add new minter again', async () => {
+    await token.addMinter(user2, { from: user1 });
+    expect(await token.isMinter(user2)).to.be.equal(true);
 
-        await expectRevert.unspecified(
-          token.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue),
-        );
-      });
+    const minters = toLowerCase(await token.getMinters());
 
-      it('can make an enter request', async () => {
-        const balance0 = await token.balanceOf(user);
+    expect(minters.length).to.be.equal(3);
+    expect(minters[0]).to.be.equal(owner);
+    expect(minters[1]).to.be.equal(user1);
+    expect(minters[2]).to.be.equal(user2);
+  });
 
-        await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
+  it('should remove owner', async () => {
+    await token.renounceMinter({ from: user1 });
+    expect(await token.isMinter(user1)).to.be.equal(false);
 
-        const balance1 = await token.balanceOf(user);
+    const minters = toLowerCase(await token.getMinters());
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
-      });
+    expect(minters.length).to.be.equal(2);
+    expect(minters[0]).to.be.equal(owner);
+    expect(minters[1]).to.be.equal(user2);
+  });
 
-      it('balance in child chain should be updated', async () => {
-        const balance0 = await token.balanceOf(user);
+  it('should remove owner again', async () => {
+    await token.renounceMinter({ from: user2 });
+    expect(await token.isMinter(user2)).to.be.equal(false);
 
-        await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
+    const minters = toLowerCase(await token.getMinters());
 
-        const balance1 = await token.balanceOf(user);
+    expect(minters.length).to.be.equal(1);
+    expect(minters[0]).to.be.equal(owner);
+  });
 
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
-      });
-    });
+  it('only minter can add new minter', async () => {
+    await expectRevert(
+      token.addMinter(other, { from: other }),
+      'MinterRole: caller does not have the Minter role',
+    );
+  });
 
-    describe('#Exit', () => {
-      const isExit = true;
+  it('only minter can mint tokens', async () => {
+    await expectRevert(
+      token.mint(other, tokenAmount, { from: other }),
+      'MinterRole: caller does not have the Minter role',
+    );
+    token.mint(other, tokenAmount, { from: owner });
+  });
 
-      it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
+  it('there can be no minter at all', async () => {
+    await token.renounceMinter({ from: owner });
+    expect(await token.isMinter(owner)).to.be.equal(false);
 
-        await expectRevert.unspecified(
-          token.applyRequestInChildChain(isExit, requestId++, user, trieKey, overTrieValue),
-        );
-      });
+    const minters = toLowerCase(await token.getMinters());
 
-      it('can make an exit request', async () => {
-        const balance0 = await token.balanceOf(user);
-
-        await token.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred)
-      });
-
-      it('balance in root chain should be updated', async () => {
-        const balance0 = await token.balanceOf(user);
-
-        await token.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await token.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred)
-      });
-    });
-
-    describe("#Role Test", () => {
-      it('Renounce Minter then check minters array', async () => {
-        await token.renounceMinter();
-        await expectRevert.unspecified(token.mint(user, tokenAmount, {from: owner}));
-
-        const remainMinters = await token.getMinters();
-        expect(remainMinters.length).to.be.equal(1);
-        expect(remainMinters[0]).to.be.equal(nullAddress);
-      });
-    });
+    expect(minters.length).to.be.equal(0);
   });
 });

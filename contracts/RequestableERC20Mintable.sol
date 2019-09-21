@@ -16,21 +16,23 @@ contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
 
   address[] public minters;
 
+  uint256 constant public MAX_NUM_MINTERS = 64;
+
   // request for other minter role
   bytes32 constant public KEY_MINTERS = keccak256("RequestableERC20Mintable.minters(address account, bool remove)");
 
   constructor(bool _development, bool _lockInRootChain)
     RequestableERC20(_development, _lockInRootChain, 0)
     public
-  {
-    minters.push(msg.sender);
-  }
+  {}
 
   function getMinters() public view returns (address[] memory) {
     return minters;
   }
 
   function _addMinter(address account) internal {
+    require(minters.length < MAX_NUM_MINTERS);
+
     minters.push(account);
     super._addMinter(account);
   }

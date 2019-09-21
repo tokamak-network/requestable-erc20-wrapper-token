@@ -22,7 +22,7 @@ contract RequestableERC20 is ReentrancyGuard, ERC20Burnable, RequestableI {
   bool public initialized;
 
   // If true, for enter request, holds requestor's token in root chain,
-  // for exit request, transfer the tokens from already have.
+  // for exit request, transfer the tokens from this contract.
   // If false, just mint and burn requestor's token.
   bool public lockInRootChain;
 
