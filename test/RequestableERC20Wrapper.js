@@ -1,31 +1,34 @@
 const { expectEvent, expectRevert } = require('openzeppelin-test-helpers');
+const { balance } = require('openzeppelin-test-helpers');
 const { padLeft, padRight } = require('./helpers/pad');
 const chai = require('chai');
 
+const RequestableERC20 = artifacts.require('./RequestableERC20.sol');
 const RequestableERC20Wrapper = artifacts.require('./RequestableERC20Wrapper.sol');
-const ERC20Mintable = artifacts.require('./ERC20Mintable.sol');
 
 chai.use(require('chai-bn')(web3.utils.BN));
 
+const { toBN, toHex } = web3.utils;
+
 const { expect } = chai;
-const development = true;
 
 contract('RequestableERC20Wrapper', (accounts) => {
-  const owner = accounts[0];
-  const user = accounts[1];
+  const [owner, user] = accounts;
 
-  const pHundred = '100';
-  const mHundred = '-100';
-  const pMillion = '1000000';
+  const development = true;
+  const lockInRootChain = false;
+  const initialSupply = toBN(100e18);
 
-  const tokenAmount = web3.utils.toBN(pMillion);
-  const requestAmount = web3.utils.toBN(pHundred);
+  const tokenAmount = toBN(1e6);
+  const requestAmount = toBN(100);
 
   let token, wrapper;
 
   before(async () => {
-    token = await ERC20Mintable.new();
-    wrapper = await RequestableERC20Wrapper.new(development, token.address);
+    token = await RequestableERC20.new(development, lockInRootChain, initialSupply);
+    wrapper = await RequestableERC20Wrapper.new(development, lockInRootChain, token.address);
+
+    await token.transfer(user, tokenAmount);
 
     console.log(`
       token:    ${token.address}
@@ -33,98 +36,34 @@ contract('RequestableERC20Wrapper', (accounts) => {
     `);
 
     await wrapper.init(owner);
-    await token.mint(user, tokenAmount);
   });
 
   describe('deposit and withdraw', async () => {
     it('user can deposit token', async () => {
-      expect(await token.balanceOf(user)).to.be.bignumber.equal(pMillion);
+      const tokenBalance0 = await token.balanceOf(user);
+      const wrapperBalance0 = await wrapper.balanceOf(user);
 
-      await token.approve(wrapper.address, tokenAmount, { from: user, gas: 9000000 });
+      await token.approve(wrapper.address, requestAmount, { from: user });
+      await wrapper.deposit(requestAmount, { from: user });
 
-      await wrapper.deposit(tokenAmount, { from: user });
-      expect(await token.balanceOf(user)).to.be.bignumber.equal('0');
-      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal(pMillion);
+      const tokenBalance1 = await token.balanceOf(user);
+      const wrapperBalance1 = await wrapper.balanceOf(user);
+
+      expect(tokenBalance1.sub(tokenBalance0)).to.be.bignumber.equal(requestAmount.neg());
+      expect(wrapperBalance1.sub(wrapperBalance0)).to.be.bignumber.equal(requestAmount);
     });
 
     it('user can withdraw token', async () => {
-      await wrapper.withdraw(requestAmount, { from: user, gas: 9000000 });
-      expect(await token.balanceOf(user)).to.be.bignumber.equal(pHundred);
-      expect(await wrapper.balanceOf(user)).to.be.bignumber.equal('999900');
-    });
-  });
+      const tokenBalance0 = await token.balanceOf(user);
+      const wrapperBalance0 = await wrapper.balanceOf(user);
 
-  describe('request on token balance', () => {
-    let requestId = 0;
-    let trieKey;
-    const trieValue = padLeft(requestAmount);
+      await wrapper.withdraw(requestAmount, { from: user });
 
-    before(async () => {
-      trieKey = await wrapper.getBalanceTrieKey(user);
-    });
+      const tokenBalance1 = await token.balanceOf(user);
+      const wrapperBalance1 = await wrapper.balanceOf(user);
 
-    describe('#Enter', () => {
-      const isExit = false;
-
-      it('cannot make an enter request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
-
-        await expectRevert.unspecified(
-          wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, overTrieValue, { gas: 9000000 }),
-        );
-      });
-
-      it('can make an enter request', async () => {
-        const balance0 = await wrapper.balanceOf(user);
-
-        await wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await wrapper.balanceOf(user);
-
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred);
-      });
-
-      it('balance in child chain should be updated', async () => {
-        const balance0 = await wrapper.balanceOf(user);
-
-        await wrapper.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await wrapper.balanceOf(user);
-
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
-      });
-    });
-
-    describe('#Exit', () => {
-      const isExit = true;
-
-      it('cannot make an exit request over his balance', async () => {
-        const overTokenAmount = web3.utils.toBN(1e19);
-        const overTrieValue = padLeft(overTokenAmount);
-
-        await expectRevert.unspecified(
-          wrapper.applyRequestInChildChain(isExit, requestId++, user, trieKey, overTrieValue),
-        );
-      });
-
-      it('can make an exit request', async () => {
-        const balance0 = await wrapper.balanceOf(user);
-
-        await wrapper.applyRequestInChildChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await wrapper.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(mHundred);
-      });
-
-      it('balance in root chain should be updated', async () => {
-        const balance0 = await wrapper.balanceOf(user);
-
-        await wrapper.applyRequestInRootChain(isExit, requestId++, user, trieKey, trieValue);
-
-        const balance1 = await wrapper.balanceOf(user);
-        expect(balance1.sub(balance0)).to.be.bignumber.equal(pHundred);
-      });
+      expect(tokenBalance1.sub(tokenBalance0)).to.be.bignumber.equal(requestAmount);
+      expect(wrapperBalance1.sub(wrapperBalance0)).to.be.bignumber.equal(requestAmount.neg());
     });
   });
 });

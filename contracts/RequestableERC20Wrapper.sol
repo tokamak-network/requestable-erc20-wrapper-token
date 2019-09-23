@@ -14,8 +14,8 @@ contract RequestableERC20Wrapper is RequestableERC20 {
   event Depositted(address _from, uint _value);
   event Withdrawn(address _from, uint _value);
 
-  constructor(bool _development, bool _lockInRootChain, uint256 _initialSupply, ERC20 _token)
-    RequestableERC20(_development, _lockInRootChain, _initialSupply)
+  constructor(bool _development, bool _lockInRootChain, ERC20 _token)
+    RequestableERC20(_development, _lockInRootChain, 0)
     public
   {
     token = _token;
