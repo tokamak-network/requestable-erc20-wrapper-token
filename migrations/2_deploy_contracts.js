@@ -16,6 +16,6 @@ module.exports = function (deployer) {
   }
 
   deployer.deploy(RequestableERC20Mintable, development, lockInRootChain).then((token) =>
-    deployer.deploy(RequestableERC20Wrapper, development, lockInRootChain, initialSupply, token.address)
+    deployer.deploy(RequestableERC20Wrapper, development, lockInRootChain, token.address)
   ).catch(e => { throw e; });
 };
