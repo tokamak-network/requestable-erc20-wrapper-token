@@ -5,10 +5,6 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
 import "./lib/RLP.sol";
 import "./RequestableERC20.sol";
 
-/**
- * @title   RequestableERC20
- * @notice  RequestableERC20 is a requestable token contract with Compatible ERC20
- */
 contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
   using SafeMath for *;
   using RLP for bytes;
@@ -19,7 +15,7 @@ contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
   uint256 constant public MAX_NUM_MINTERS = 64;
 
   // request for other minter role
-  bytes32 constant public KEY_MINTERS = keccak256("RequestableERC20Mintable.minters(address account, bool remove)");
+  bytes32 constant public KEY_MINTERS = keccak256("RequestableERC20Mintable.minters(address account, bool isNew)");
 
   constructor(bool _development, bool _lockInRootChain)
     RequestableERC20(_development, _lockInRootChain, 0)
@@ -61,17 +57,17 @@ contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
 
     RLP.RLPItem[] memory list = trieValue.toRLPItem().toList(2);
     address minter = list[0].toAddress();
-    bool remove = (list[1].toUint() != 0);
+    bool isNew = (list[1].toUint() != 0);
 
     if (isExit) {
-      if (remove) {
-        if (isMinter(minter)) _removeMinter(minter);
-      } else {
+      if (isNew) {
         if (!isMinter(minter)) _addMinter(minter);
+      } else {
+        if (isMinter(minter)) _removeMinter(minter);
       }
     } else {
-      if (remove) require(!isMinter(minter));
-      else require(isMinter(minter));
+      if (isNew) require(isMinter(minter));
+      else require(!isMinter(minter));
     }
 
     emit Requested(isExit, requestor, trieKey, trieValue);
@@ -90,16 +86,16 @@ contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
 
     RLP.RLPItem[] memory list = trieValue.toRLPItem().toList(2);
     address minter = list[0].toAddress();
-    bool remove = (list[1].toUint() != 0);
+    bool isNew = (list[1].toUint() != 0);
 
     if (isExit) {
-      if (remove) require(!isMinter(minter));
-      else require(isMinter(minter));
+      if (isNew) require(isMinter(minter));
+      else require(!isMinter(minter));
     } else {
-      if (remove) {
-        if (isMinter(minter)) _removeMinter(minter);
-      } else {
+      if (isNew) {
         if (!isMinter(minter)) _addMinter(minter);
+      } else {
+        if (isMinter(minter)) _removeMinter(minter);
       }
     }
 
