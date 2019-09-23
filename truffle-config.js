@@ -13,6 +13,17 @@ module.exports = {
       network_id: '*', // eslint-disable-line camelcase
     },
   },
+  compilers: {
+    solc: {
+      version: '0.5.8',
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+      },
+    },
+  },
   mocha: {
     reporter: 'eth-gas-reporter',
     reporterOptions: {
