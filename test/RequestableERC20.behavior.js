@@ -7,14 +7,12 @@ const { toBN, toHex } = web3.utils;
 
 const { expect } = chai;
 
-function shouldBehaveLikeRequestableERC20 (owner, user) {
+function shouldBehaveLikeRequestableERC20 (owner, user, requestId = 0) {
   const tokenAmount = toBN(1000000);
   const requestAmount = toBN(100);
   const overTokenAmount = toBN(1e19);
 
-  let requestId = 0;
-
-  describe('Apply request', function () {
+  describe('#RequestableERC20', function () {
     let trieKey;
     const trieValue = RLP.encode([owner, toHex(requestAmount)]);
     const overTrieValue = RLP.encode([owner, toHex(overTokenAmount)]);
@@ -24,7 +22,7 @@ function shouldBehaveLikeRequestableERC20 (owner, user) {
       await this.token.approve(user, tokenAmount);
     });
 
-    describe('#allowances', function () {
+    describe('#RequestableERC20.allowances', function () {
       describe('#Enter', function () {
         const isExit = false;
 
@@ -86,7 +84,7 @@ function shouldBehaveLikeRequestableERC20 (owner, user) {
     });
   });
 
-  describe('#balances', function () {
+  describe('#RequestableERC20.balances', function () {
     let trieKey;
     const trieValue = RLP.encode(toHex(requestAmount));
     const overTrieValue = RLP.encode(toHex(overTokenAmount));

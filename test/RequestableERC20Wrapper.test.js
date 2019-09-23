@@ -74,6 +74,6 @@ contract('RequestableERC20Wrapper', function (accounts) {
       await wrapper.deposit(tokenAmount, { from: user });
     });
 
-    shouldBehaveLikeRequestableERC20(owner, user);
+    shouldBehaveLikeRequestableERC20(owner, user, 0);
   });
 });

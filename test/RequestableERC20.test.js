@@ -22,5 +22,5 @@ contract('RequestableERC20', function (accounts) {
     await this.token.transfer(user, tokenAmount, { from: owner });
   });
 
-  shouldBehaveLikeRequestableERC20(owner, user);
+  shouldBehaveLikeRequestableERC20(owner, user, 0);
 });

@@ -17,11 +17,6 @@ contract RequestableERC20Mintable is RequestableERC20, ERC20Mintable {
   // request for other minter role
   bytes32 constant public KEY_MINTERS = keccak256("RequestableERC20Mintable.minters(address account, bool isNew)");
 
-  constructor(bool _development, bool _lockInRootChain)
-    RequestableERC20(_development, _lockInRootChain, 0)
-    public
-  {}
-
   function getMinters() public view returns (address[] memory) {
     return minters;
   }
