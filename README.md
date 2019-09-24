@@ -19,13 +19,13 @@ You can also add truffle arguments at the end of script after ` -- `, like `npm 
 # 1. deploy RequestableERC20Wrapper
 $ TOKEN=0x5251336Bd7e7D3Eba15F422436f76BECfB0c84E8 npm run deploy
 
-# 2. deploy RequestableERC20Mintable
+# 2. deploy RequestableERC20MintableMock
 $ npm run deploy:mintable
 
-# 3. deploy RequestableERC20Burnable
+# 3. deploy RequestableERC20BurnableMock
 $ npm run deploy:burnable
 
-# 4. deploy RequestableERC20MintableBurnable
+# 4. deploy RequestableERC20MintableBurnableMock
 $ npm run deploy:mintable:burnable
 ```
 
@@ -39,10 +39,10 @@ $ npm run deploy:mintable:burnable
 | LOCK_IN_ROOTCHAIN | If true, for enter request, holds requestor's token in root chain, for exit request, transfer the tokens from this contract. If false, just mint and burn requestor's token. |
 | INITIAL_SUPPLY    | the amount of tokens to deployer                                                                                                                                             |
 | TOKEN             | base token contract address for RequestableERC20Wrapper                                                                                                                      |
-| MINTABLE          | deploy mintable                                                                                                                                                              |
-| BURNABLE          | deploy burnable                                                                                                                                                              |
+| MINTABLE          | deploy mintable (DO NOT DIRECTLY USE THIS, USE NPM SCRIPT INSTEAD)                                                                                                           |
+| BURNABLE          | deploy burnable (DO NOT DIRECTLY USE THIS, USE NPM SCRIPT INSTEAD)                                                                                                           |
 
-If both `MINTABLE` and `BURNABLE` are set, truffle will deploy ERC20MintableBurnable
+If both `MINTABLE` and `BURNABLE` are set, truffle will deploy ERC20MintableBurnable. See more [deploy script](./migrations/2_deploy_contracts.js).
 
 #### Usages
 
@@ -58,6 +58,16 @@ Prefix `Requestable` in contract name is omitted for briefness.
 | MINTABLE          |       |              | o             |               | o                     |
 | BURNABLE          |       |              |               | o             | o                     |
 
-## Requestable Variables
+## Make a Request
 
-TBD
+Before making request, [`RootChain`](https://github.com/Onther-Tech/plasma-evm-contracts) contract must be set in `RequestableERC20*` contract. To do this, use `RequestableERC20.init(address rootchain)`.
+
+### Requestable Variables
+> `isNew` is 1 for true, 0 for false.
+
+| Requestable Variables                | trieKey                                                                    | trieValue                      |
+|--------------------------------------|----------------------------------------------------------------------------|--------------------------------|
+| `ERC20.allownace[owner][requestor]`  | [`RequestableERC20.KEY_ALLOWANCE`](./contracts/RequestableERC20.sol#L35)       | `RLP.encode([owner, amount])`  |
+| `ERC20.balances[requestor]`          | [`RequestableERC20.KEY_BALANCES`](./contracts/RequestableERC20.sol#L38)        | `RLP.encode(amount)`           |
+| `RequestableERC20Mintable.minters[]` | [`RequestableERC20Mintable.KEY_MINTERS`](./contracts/RequestableERC20Mintable.sol#L18) | `RLP.encode([minter, isNew])`  |
+| `RequestableERC20Burnable.burners[]` | [`RequestableERC20Burnable.KEY_BURNERS`](./contracts/RequestableERC20Burnable.sol#L23) | `RLP.encode([burner, isNew])` |
