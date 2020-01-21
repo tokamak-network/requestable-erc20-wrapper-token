@@ -25,7 +25,7 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
   event RequestCreated(bool _isExit, address _requestor, bytes32 _trieKey, uint _value);
 
   modifier isInitialized() {
-    require(initialized);
+    require(initialized, "RequestableERC20Wrapper: not initialized yet");
     _;
   }
 
@@ -68,8 +68,8 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
     bytes32 trieKey,
     bytes calldata trieValue
   ) external isInitialized returns (bool success) {
-    require(msg.sender == address(rootchain));
-    require(trieKey == getBalanceTrieKey(requestor));
+    require(msg.sender == address(rootchain), "RequestableERC20Wrapper: msg.sender is not rootchain");
+    require(trieKey == getBalanceTrieKey(requestor), "RequestableERC20Wrapper: balance trie key is mismatched for requestor");
 
     uint v = decodeTrieValue(trieValue);
 
@@ -108,7 +108,7 @@ contract RequestableERC20Wrapper is StandardToken, RequestableI {
   }
 
   function decodeTrieValue(bytes memory trieValue) public pure returns (uint v) {
-    require(trieValue.length == 0x20);
+    require(trieValue.length == 0x20, "RequestableERC20Wrapper: trie key length must be 0x20");
 
     assembly {
        v := mload(add(trieValue, 0x20))
